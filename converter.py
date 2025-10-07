@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """
-Neutrino Telescope Memory-Mapped File Converter
+Neutrino     # Determine available source choices based on dependencies
+    available_sources = ["prometheus", "magnemite"]
+    if ICECUBE_AVAILABLE:
+        available_sources.append("icecube")scope Memory-Mapped File Converter
 
 Converts neutrino telescope data (Prometheus, IceCube) into efficient
 memory-mapped files for ML training and analysis.
@@ -32,7 +35,7 @@ def main():
     )
 
     # Determine available source choices based on dependencies
-    available_sources = ["prometheus"]
+    available_sources = ["prometheus","magnemite"]
     if ICECUBE_AVAILABLE:
         available_sources.append("icecube")
 
@@ -89,6 +92,13 @@ def main():
         help="Name of the pulse series to extract from i3 files"
     )
 
+    parser.add_argument(
+        "--filetype",
+        type=str,
+        default="SIREN",
+        help="File type to process (one of SIREN, NuGen, CORSIKA)"
+    )
+
     args = parser.parse_args()
 
     # Validate input path
@@ -96,6 +106,11 @@ def main():
         print(f"Error: Input path does not exist: {args.input}")
         sys.exit(1)
 
+    # Validate magnemite filetype requirement
+    if args.source == "magnemite" and args.filetype is None:
+        print("Error: --filetype is required when using --source magnemite")
+        print("Supported filetypes: SIREN, NuGen, CORSIKA")
+        sys.exit(1)
     # Create output directory if needed
     output_dir = os.path.dirname(args.output)
     if output_dir and not os.path.exists(output_dir):
@@ -127,7 +142,7 @@ def main():
             )
         elif args.source == "magnemite":
             num_events, total_photons = convert_magnemite_to_mmap(
-                args.input, args.output, args.file_range, args.grouping_window_ns
+                args.input, args.output, args.file_range, args.grouping_window_ns, filetype=args.filetype
             )
         else:
             print(f"Error: Unsupported source format: {args.source}")

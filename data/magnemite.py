@@ -108,133 +108,196 @@ def find_parquet_files(input_path: str) -> list:
     return files
 
 
-def parse_mc_truth(mc_truth_dict: Dict[str, Any], filetype=None) -> Dict[str, Any]:
+def parse_mc_truth(mc_truth_df, filetype=None) -> Dict[str, Any]:
     """
     Parse MC truth information from magnemite format.
 
     Args:
-        mc_truth_dict: Raw mc_truth dictionary from parquet
+        mc_truth_df: Pandas DataFrame with mc_truth data (single row expected)
+        filetype: Type of file being processed (SIREN, NuGen, CORSIKA)
 
     Returns:
         Cleaned dictionary suitable for EventRecord
     """
+    # Extract the first (and should be only) row as a Series
+    if len(mc_truth_df) == 0:
+        raise ValueError("Empty mc_truth DataFrame")
+
+    # Get the first row as a pandas Series
+    row = mc_truth_df.iloc[0]
+
     if filetype=="SIREN":
         # HNL-specific fields
         parsed = {
             # neutrino
-            'nu_energy': mc_truth_dict['nu_energy'],
-            'nu_azimuth': mc_truth_dict['nu_azimuth'],
-            'nu_zenith': mc_truth_dict['nu_zenith'],
-            'nu_pos_x': mc_truth_dict['nu_pos_x'],
-            'nu_pos_y': mc_truth_dict['nu_pos_y'],
-            'nu_pos_z': mc_truth_dict['nu_pos_z'],
-            'nu_pdg': mc_truth_dict['nu_pdg'],
+            'initial_energy': float(row['nu_energy']),
+            'initial_azimuth': float(row['nu_azimuth']),
+            'initial_zenith': float(row['nu_zenith']),
+            'initial_x': float(row['nu_pos_x']),
+            'initial_y': float(row['nu_pos_y']),
+            'initial_z': float(row['nu_pos_z']),
+            'initial_type': int(row['nu_pdg']),
+            'interaction': 0, # signal events: HNL interactions
             # hadrons
-            'hadrons_energy': mc_truth_dict['hadrons_energy'],
-            'hadrons_azimuth': mc_truth_dict['hadrons_azimuth'],
-            'hadrons_zenith': mc_truth_dict['hadrons_zenith'],
-            'hadrons_pos_x': mc_truth_dict['hadrons_pos_x'],
-            'hadrons_pos_y': mc_truth_dict['hadrons_pos_y'],
-            'hadrons_pos_z': mc_truth_dict['hadrons_pos_z'],
-            'hadrons_time': mc_truth_dict['hadrons_time'],
+            'final_energy': [float(row['hnl_energy']),
+                             float(row['hadrons_energy']),
+                             float(row['gamma_energy']),
+                             0.0, 0.0
+                             ],
+            'final_azimuth': [0.0,
+                              float(row['hadrons_azimuth']),
+                              float(row['gamma_azimuth']),
+                              0.0, 0.0
+                              ],
+            'final_zenith': [0.0,
+                             float(row['hadrons_zenith']),
+                             float(row['gamma_zenith']),
+                             0.0, 0.0
+                             ],
+            'final_x': [float(row['nu_pos_x']),  # Use nu_pos for HNL position
+                        float(row['hadrons_pos_x']),
+                        float(row['gamma_pos_x']),
+                        0.0, 0.0
+                        ],
+            'final_y': [float(row['nu_pos_y']),  # Use nu_pos for HNL position
+                        float(row['hadrons_pos_y']),
+                        float(row['gamma_pos_y']),
+                        0.0, 0.0
+                        ],
+            'final_z': [float(row['nu_pos_z']),  # Use nu_pos for HNL position
+                        float(row['hadrons_pos_z']),
+                        float(row['gamma_pos_z']),
+                        0.0, 0.0
+                        ],
+            'final_type': [5910,
+                           2212, # hadrons as proton (2212)
+                           22,   # gamma (22)
+                           0, 0
+                           ],
             # HNL
-            'hnl_energy': mc_truth_dict['hnl_energy'],
-            'hnl_length': mc_truth_dict['hnl_length'],
-            # gamma
-            'gamma_energy': mc_truth_dict['gamma_energy'],
-            'gamma_azimuth': mc_truth_dict['gamma_azimuth'],
-            'gamma_zenith': mc_truth_dict['gamma_zenith'],
-            'gamma_pos_x': mc_truth_dict['gamma_pos_x'],
-            'gamma_pos_y': mc_truth_dict['gamma_pos_y'],
-            'gamma_pos_z': mc_truth_dict['gamma_pos_z'],
-            'gamma_time': mc_truth_dict['gamma_time'],
-            # common
-            'run_id': mc_truth_dict['run_id'],
-            'event_id': mc_truth_dict['event_id'],
-            'event_weight': mc_truth_dict['siren_weight'],
-            'BDT_pred': mc_truth_dict['BDT_pred'],
-            'Homogenized_QTot': mc_truth_dict['Homogenized_QTot'],
+            'hnl_length': float(row['hnl_length']),
+            'event_weight': float(row['siren_weight']),
         }
     elif filetype=="NuGen":
         # NuGen-specific fields
         parsed = {
             # neutrino
-            'nu_energy': mc_truth_dict['nu_energy'],
-            'nu_azimuth': mc_truth_dict['nu_azimuth'],
-            'nu_zenith': mc_truth_dict['nu_zenith'],
-            'nu_pos_x': mc_truth_dict['nu_pos_x'],
-            'nu_pos_y': mc_truth_dict['nu_pos_y'],
-            'nu_pos_z': mc_truth_dict['nu_pos_z'],
-            'nu_pdg': mc_truth_dict['nu_pdg'],
+            'initial_energy': float(row['nu_energy']),
+            'initial_azimuth': float(row['nu_azimuth']),
+            'initial_zenith': float(row['nu_zenith']),
+            'initial_x': float(row['nu_pos_x']),
+            'initial_y': float(row['nu_pos_y']),
+            'initial_z': float(row['nu_pos_z']),
+            'initial_type': int(row['nu_pdg']),
+            'interaction': 2 if int(row['nu_pdg'])==int(row['lepton_pdg']) else 1, # background events: nu interactions (1 = CC, 2 = NC)
             # hadrons
-            'hadrons_energy': mc_truth_dict['hadrons_energy'],
-            'hadrons_azimuth': mc_truth_dict['hadrons_azimuth'],
-            'hadrons_zenith': mc_truth_dict['hadrons_zenith'],
-            'hadrons_pos_x': mc_truth_dict['hadrons_pos_x'],
-            'hadrons_pos_y': mc_truth_dict['hadrons_pos_y'],
-            'hadrons_pos_z': mc_truth_dict['hadrons_pos_z'],
-            'hadrons_time': mc_truth_dict['hadrons_time'],
-            # lepton
-            'lepton_energy': mc_truth_dict['lepton_energy'],
-            'lepton_azimuth': mc_truth_dict['lepton_azimuth'],
-            'lepton_zenith': mc_truth_dict['lepton_zenith'],
-            'lepton_pos_x': mc_truth_dict['lepton_pos_x'],
-            'lepton_pos_y': mc_truth_dict['lepton_pos_y'],
-            'lepton_pos_z': mc_truth_dict['lepton_pos_z'],
-            'lepton_time': mc_truth_dict['lepton_time'],
-            'lepton_pdg': mc_truth_dict['lepton_pdg'],
-            # common
-            'run_id': mc_truth_dict['run_id'],
-            'event_id': mc_truth_dict['event_id'],
-            'event_weight': mc_truth_dict['nugen_weight'],
-            'BDT_pred': mc_truth_dict['BDT_pred'],
-            'Homogenized_QTot': mc_truth_dict['Homogenized_QTot'],
+            'final_energy': [float(row['lepton_energy']),
+                             float(row['hadrons_energy']),
+                             0.0, 0.0, 0.0
+                             ],
+            'final_azimuth': [float(row['lepton_azimuth']),
+                              float(row['hadrons_azimuth']),
+                              0.0, 0.0, 0.0
+                             ],
+            'final_zenith': [float(row['lepton_zenith']),
+                             float(row['hadrons_zenith']),
+                             0.0, 0.0, 0.0
+                            ],
+            'final_x': [float(row['lepton_pos_x']),
+                        float(row['hadrons_pos_x']),
+                        0.0, 0.0, 0.0
+                        ],
+            'final_y': [float(row['lepton_pos_y']),
+                        float(row['hadrons_pos_y']),
+                        0.0, 0.0, 0.0
+                        ],
+            'final_z': [float(row['lepton_pos_z']),
+                        float(row['hadrons_pos_z']),
+                        0.0, 0.0, 0.0
+                        ],
+            'final_type': [int(row['lepton_pdg']),
+                           int(row['hadrons_pdg']),
+                           0, 0, 0
+                           ],
+            # HNL
+            'hnl_length': -1.0,
+            'event_weight': float(row['nugen_weight']),
         }
     elif filetype=="CORSIKA":
         # CORSIKA-specific fields
         parsed = {
             # primary
-            'primary_energy': mc_truth_dict['primary_energy'],
-            'primary_azimuth': mc_truth_dict['primary_azimuth'],
-            'primary_zenith': mc_truth_dict['primary_zenith'],
-            'primary_pos_x': mc_truth_dict['primary_pos_x'],
-            'primary_pos_y': mc_truth_dict['primary_pos_y'],
-            'primary_pos_z': mc_truth_dict['primary_pos_z'],
-            'primary_pdg': mc_truth_dict['primary_pdg'],
-            # common
-            'run_id': mc_truth_dict['run_id'],
-            'event_id': mc_truth_dict['event_id'],
-            'event_weight': mc_truth_dict['corsika_weight'],
-            'BDT_pred': mc_truth_dict['BDT_pred'],
-            'Homogenized_QTot': mc_truth_dict['Homogenized_QTot'],
+            'initial_energy': float(row['primary_energy']),
+            'initial_azimuth': float(row['primary_azimuth']),
+            'initial_zenith': float(row['primary_zenith']),
+            'initial_x': float(row['primary_pos_x']),
+            'initial_y': float(row['primary_pos_y']),
+            'initial_z': float(row['primary_pos_z']),
+            'initial_type': int(row['primary_pdg']),
+            'interaction': 3, # background events: cosmics
+            # hadrons
+            'final_energy': [0.0,0.0,0.0, 0.0, 0.0],
+            'final_azimuth': [0.0, 0.0, 0.0, 0.0, 0.0],
+            'final_zenith': [0.0, 0.0, 0.0, 0.0, 0.0],
+            'final_x': [0.0, 0.0, 0.0, 0.0, 0.0],
+            'final_y': [0.0, 0.0, 0.0, 0.0, 0.0],
+            'final_z': [0.0, 0.0, 0.0, 0.0, 0.0],
+            'final_type': [0,0,0,0,0],
+            # HNL
+            'hnl_length': -1.0,
+            'event_weight': float(row['corsika_weight']),
         }
+    else:
+        raise ValueError(f"Unknown filetype: {filetype}. Supported types: SIREN, NuGen, CORSIKA")
+
+    # Common fields for all file types
+    parsed['run_id'] = int(row['run_id'])
+    parsed['event_id'] = int(row['event_id'])
+    parsed['homogenized_qtot'] = float(row['Homogenized_QTot'])
+    parsed['BDT_pred'] = float(row.get('BDT_pred', -1.0))
+
+    # Initialize selected filter-pass booleans (used as input to BDT in Mag0)
+    selected_filters = {
+        "GRECOOnlineFilter_19": "filter_grecoonline_19",
+        "DeepCoreFilter_13": "filter_deepcore_13",
+        "LowUp_13": "filter_lowup_13",
+        "FSSCandidate_13": "filter_fsscandidate_13",
+        "OnlineL2Filter_17": "filter_onlinel2_17",
+        "MuonFilter_13": "filter_muon_13",
+        "FSSFilter_13": "filter_fss_13",
+        "CascadeFilter_13": "filter_cascade_13",
+        "MESEFilter_15": "filter_mese_15"
+    }
+    for filter_key, out_name in selected_filters.items():
+        if filter_key in row:
+            parsed[out_name] = bool(row[filter_key])
+        else:
+            parsed[out_name] = False
 
     return parsed
 
 
-def parse_photons(photons_dict: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
+def parse_photons(photons_df) -> Dict[str, np.ndarray]:
     """
-    Parse photon information from Prometheus format.
+    Parse photon information from Magnemite format.
 
     Args:
-        photons_dict: Raw photons dictionary from parquet
+        photons_df: Pandas DataFrame with photon data
 
     Returns:
         Cleaned dictionary suitable for PhotonHit
     """
     return {
-        'sensor_pos_x': photons_dict['x'],
-        'sensor_pos_y': photons_dict['y'],
-        'sensor_pos_z': photons_dict['z'],
-        't': photons_dict['time'],
-        'charge': photons_dict['charge'],
-        'string_id': photons_dict['string'],
-        'sensor_id': photons_dict['om'],
-        'run_id': photons_dict['run_id'],
-        'id_idx': np.zeros_like(photons_dict['event_id']),
+        'sensor_pos_x': photons_df['x'].values,
+        'sensor_pos_y': photons_df['y'].values,
+        'sensor_pos_z': photons_df['z'].values,
+        't': photons_df['time'].values,
+        'charge': photons_df['charge'].values,
+        'string_id': photons_df['string'].values,
+        'sensor_id': photons_df['om'].values,
+        'run_id': photons_df['run_id'].values,
+        'id_idx': np.zeros_like(photons_df['event_id'].values),
     }
-
-
 def process_photons_with_grouping(photons_dict: Dict[str, np.ndarray],
                                  grouping_window_ns: float) -> Dict[str, np.ndarray]:
     """
@@ -356,7 +419,7 @@ def process_photons_with_grouping(photons_dict: Dict[str, np.ndarray],
 
 
 
-def iter_magnemite_events(parquet_files: list) -> Iterator[Tuple[Dict[str, Any], Dict[str, np.ndarray]]]:
+def iter_magnemite_events(parquet_files: list, filetype: str) -> Iterator[Tuple[Dict[str, Any], Dict[str, np.ndarray]]]:
     """
     Iterate over all events in MagNeMITe parquet files.
 
@@ -382,7 +445,7 @@ def iter_magnemite_events(parquet_files: list) -> Iterator[Tuple[Dict[str, Any],
         for event_id in event_df["event_id"].unique():
             # Extract mc_truth
             mc_truth_raw = event_df[event_df["event_id"] == event_id]
-            mc_truth = parse_mc_truth(mc_truth_raw)
+            mc_truth = parse_mc_truth(mc_truth_raw,filetype=filetype)
 
             # Extract photons
             photons_raw = pulse_df[pulse_df["event_id"] == event_id]
@@ -391,7 +454,8 @@ def iter_magnemite_events(parquet_files: list) -> Iterator[Tuple[Dict[str, Any],
 
 
 def convert_magnemite_to_mmap(input_path: str, output_path: str,
-                              file_range: str = None, grouping_window_ns: float = 0.0) -> Tuple[int, int]:
+                              file_range: str = None, grouping_window_ns: float = 0.0,
+                              filetype: str = None) -> Tuple[int, int]:
     """
     Convert MagNeMITe parquet files to memory-mapped format using streaming approach.
 
@@ -427,14 +491,14 @@ def convert_magnemite_to_mmap(input_path: str, output_path: str,
     events_per_file_estimate = 1000
     initial_estimate = len(parquet_files) * events_per_file_estimate
 
-    idx_path, data_file_path = create_streaming_mmap_files(output_path, initial_estimate, source_type='prometheus')
+    idx_path, data_file_path = create_streaming_mmap_files(output_path, initial_estimate, source_type='magnemite')
     index_writer = StreamingIndexWriter(idx_path, initial_estimate)
 
     # Convert events
     total_photons = 0
     current_photon_idx = 0
 
-    for mc_truth, photons_raw in iter_magnemite_events(parquet_files):
+    for mc_truth, photons_raw in iter_magnemite_events(parquet_files,filetype=filetype):
         # Process photons with optional grouping
         photons = process_photons_with_grouping(photons_raw, grouping_window_ns)
 
@@ -453,8 +517,8 @@ def convert_magnemite_to_mmap(input_path: str, output_path: str,
         unique_channels = np.unique(sensor_string_pairs, axis=0)
         mc_truth['num_chans'] = len(unique_channels)
 
-        # Create event record using Prometheus-specific dtype
-        event_record = EventRecord.from_dict(mc_truth, source_type='prometheus')
+        # Create event record using Magnemite-specific dtype
+        event_record = EventRecord.from_dict(mc_truth, source_type='magnemite')
 
         # Set photon indexing information
         event_record['photon_start_idx'] = current_photon_idx
