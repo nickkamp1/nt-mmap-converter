@@ -99,6 +99,13 @@ def main():
         help="File type to process (one of SIREN, NuGen, CORSIKA)"
     )
 
+    parser.add_argument(
+        "--cuts",
+        type=str,
+        default=None,
+        help="cuts to apply to the parquet files"
+    )
+
     args = parser.parse_args()
 
     # Validate input path
@@ -142,7 +149,7 @@ def main():
             )
         elif args.source == "magnemite":
             num_events, total_photons = convert_magnemite_to_mmap(
-                args.input, args.output, args.file_range, args.grouping_window_ns, filetype=args.filetype
+                args.input, args.output, args.file_range, args.grouping_window_ns, filetype=args.filetype, cuts=args.cuts
             )
         else:
             print(f"Error: Unsupported source format: {args.source}")
