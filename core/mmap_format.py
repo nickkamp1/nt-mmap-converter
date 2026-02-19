@@ -84,6 +84,12 @@ MAGNEMITE_EVENT_RECORD_DTYPE = np.dtype([
     ('initial_type', np.int32),
     ('interaction', np.int32),  # 0=HNL, 1=CC, 2=NC, 3=cosmics
 
+    # Classification fields
+    ('classification', np.int32),  # Event classification code
+    ('morphology', np.int32),      # Event morphology code
+    ('is_signal', np.bool_),       # True if signal event
+    ('is_background', np.bool_),   # True if background event
+
     # Final state arrays (5 particles, zero-padded)
     ('final_energy', np.float32, (5,)),
     ('final_type', np.int32, (5,)),
@@ -190,6 +196,7 @@ class EventRecord:
         if source_type.lower() == 'icecube':
             scalar_fields = ['initial_energy', 'initial_zenith', 'initial_azimuth',
                              'initial_x', 'initial_y', 'initial_z', 'initial_type', 'interaction',
+                             'classification', 'morphology', 'is_signal', 'is_background',
                              # Selected filter flags
                              'filter_muon_13', 'filter_cascade_13', 'filter_fss_13',
                              'filter_hese_15', 'filter_onlinel2_17', 'filter_sun_13']
@@ -197,6 +204,7 @@ class EventRecord:
             scalar_fields = ['run_id', 'event_id', 'homogenized_qtot', 'BDT_pred',
                              'initial_energy', 'initial_zenith', 'initial_azimuth',
                              'initial_x', 'initial_y', 'initial_z', 'initial_type', 'interaction',
+                             'classification', 'morphology', 'is_signal', 'is_background',
                              'hnl_length', 'event_weight',
                              # Filter flags
                              'filter_grecoonline_19', 'filter_deepcore_13', 'filter_lowup_13',

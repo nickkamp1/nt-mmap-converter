@@ -255,6 +255,11 @@ def parse_mc_truth(mc_truth_df, filetype=None) -> Dict[str, Any]:
     parsed['event_id'] = int(row['event_id'])
     parsed['homogenized_qtot'] = float(row['Homogenized_QTot'])
     parsed['BDT_pred'] = float(row.get('BDT_pred', -1.0))
+    # Classification fields
+    parsed['classification'] = int(row.get('classification', -9999))
+    parsed['morphology'] = int(row.get('morphology', -9999))
+    parsed['is_signal'] = bool(row.get('is_signal', False))
+    parsed['is_background'] = bool(row.get('is_background', False))
 
     # Initialize selected filter-pass booleans (used as input to BDT in Mag0)
     selected_filters = {
@@ -281,23 +286,60 @@ def parse_photons(photons_df) -> Dict[str, np.ndarray]:
     """
     Parse photon information from Magnemite format.
 
+    Handles the case where photons_df has nested arrays (one row per event,
+    each column contains array of pulse values) or flat structure (one row per pulse).
+
     Args:
         photons_df: Pandas DataFrame with photon data
 
     Returns:
         Cleaned dictionary suitable for PhotonHit
     """
-    return {
-        'sensor_pos_x': photons_df['x'].values,
-        'sensor_pos_y': photons_df['y'].values,
-        'sensor_pos_z': photons_df['z'].values,
-        't': photons_df['time'].values,
-        'charge': photons_df['charge'].values,
-        'string_id': photons_df['string'].values,
-        'sensor_id': photons_df['om'].values,
-        'run_id': photons_df['run_id'].values,
-        'id_idx': np.zeros_like(photons_df['event_id'].values),
-    }
+    # Check if we have nested arrays (MagNeMITe parquet format)
+    # In this format, each row is an event and columns like x contain arrays of pulse values
+    if len(photons_df) > 0 and hasattr(photons_df["x"].iloc[0], "__len__") and not isinstance(photons_df["x"].iloc[0], str):
+        # Nested array format - concatenate all arrays
+        x_vals = np.concatenate(photons_df["x"].values)
+        y_vals = np.concatenate(photons_df["y"].values)
+        z_vals = np.concatenate(photons_df["z"].values)
+        time_vals = np.concatenate(photons_df["time"].values)
+        charge_vals = np.concatenate(photons_df["charge"].values)
+        string_vals = np.concatenate(photons_df["string"].values)
+        om_vals = np.concatenate(photons_df["om"].values)
+
+        # For run_id, need to repeat for each pulse in each event
+        run_ids = []
+        for idx, row in photons_df.iterrows():
+            n_pulses = len(row["x"])
+            run_ids.extend([row["run_id"]] * n_pulses)
+        run_id_vals = np.array(run_ids)
+
+        return {
+            "sensor_pos_x": x_vals.astype(np.float32),
+            "sensor_pos_y": y_vals.astype(np.float32),
+            "sensor_pos_z": z_vals.astype(np.float32),
+            "t": time_vals.astype(np.float32),
+            "charge": charge_vals.astype(np.float32),
+            "string_id": string_vals.astype(np.uint32),
+            "sensor_id": om_vals.astype(np.uint32),
+            "run_id": run_id_vals.astype(np.uint64),
+            "id_idx": np.zeros(len(x_vals), dtype=np.uint64),
+        }
+    else:
+        # Flat format - direct access
+        return {
+            "sensor_pos_x": photons_df["x"].values.astype(np.float32),
+            "sensor_pos_y": photons_df["y"].values.astype(np.float32),
+            "sensor_pos_z": photons_df["z"].values.astype(np.float32),
+            "t": photons_df["time"].values.astype(np.float32),
+            "charge": photons_df["charge"].values.astype(np.float32),
+            "string_id": photons_df["string"].values.astype(np.uint32),
+            "sensor_id": photons_df["om"].values.astype(np.uint32),
+            "run_id": photons_df["run_id"].values.astype(np.uint64),
+            "id_idx": np.zeros_like(photons_df["event_id"].values, dtype=np.uint64),
+        }
+
+
 def process_photons_with_grouping(photons_dict: Dict[str, np.ndarray],
                                  grouping_window_ns: float) -> Dict[str, np.ndarray]:
     """
@@ -419,12 +461,14 @@ def process_photons_with_grouping(photons_dict: Dict[str, np.ndarray],
 
 
 
-def iter_magnemite_events(parquet_files: list, filetype: str) -> Iterator[Tuple[Dict[str, Any], Dict[str, np.ndarray]]]:
+def iter_magnemite_events(parquet_files: list, filetype: str, cuts: str = None) -> Iterator[Tuple[Dict[str, Any], Dict[str, np.ndarray]]]:
     """
     Iterate over all events in MagNeMITe parquet files.
 
     Args:
         parquet_files: List of parquet event file paths
+        filetype: name of generator
+        cuts: any cuts to apply to the data
 
     Yields:
         Tuple of (mc_truth_dict, photons_dict) for each event
@@ -437,6 +481,8 @@ def iter_magnemite_events(parquet_files: list, filetype: str) -> Iterator[Tuple[
             continue
         try:
             event_df = pd.read_parquet(event_file_path)
+            if cuts is not None:
+                event_df.query(cuts,inplace=True)
             pulse_df = pd.read_parquet(pulse_file_path)
         except Exception as e:
             print(f"Error reading {event_file_path}: {e}")
@@ -455,7 +501,7 @@ def iter_magnemite_events(parquet_files: list, filetype: str) -> Iterator[Tuple[
 
 def convert_magnemite_to_mmap(input_path: str, output_path: str,
                               file_range: str = None, grouping_window_ns: float = 0.0,
-                              filetype: str = None) -> Tuple[int, int]:
+                              filetype: str = None, cuts: str = None) -> Tuple[int, int]:
     """
     Convert MagNeMITe parquet files to memory-mapped format using streaming approach.
 
@@ -464,6 +510,8 @@ def convert_magnemite_to_mmap(input_path: str, output_path: str,
         output_path: Output path for memory-mapped files (without extension)
         file_range: Range of files to convert, e.g., '0-100' or '100-115'
         grouping_window_ns: Time window for hit grouping per sensor (0 = no grouping)
+        filteype: type of generator
+        cuts: any cuts to apply to the data
 
     Returns:
         Tuple of (num_events_converted, total_photons)
@@ -498,7 +546,7 @@ def convert_magnemite_to_mmap(input_path: str, output_path: str,
     total_photons = 0
     current_photon_idx = 0
 
-    for mc_truth, photons_raw in iter_magnemite_events(parquet_files,filetype=filetype):
+    for mc_truth, photons_raw in iter_magnemite_events(parquet_files,filetype=filetype,cuts=cuts):
         # Process photons with optional grouping
         photons = process_photons_with_grouping(photons_raw, grouping_window_ns)
 
