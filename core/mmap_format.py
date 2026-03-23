@@ -95,9 +95,9 @@ MAGNEMITE_EVENT_RECORD_DTYPE = np.dtype([
     ('final_type', np.int32, (5,)),
     ('final_zenith', np.float32, (5,)),
     ('final_azimuth', np.float32, (5,)),
-    ('final_x', np.float32, (5,)),
-    ('final_y', np.float32, (5,)),
-    ('final_z', np.float32, (5,)),
+    ('final_x', np.float32, (2,)), # just production and decay
+    ('final_y', np.float32, (2,)),
+    ('final_z', np.float32, (2,)),
 
     # HNL-specific fields
     ('hnl_length', np.float32),
@@ -257,13 +257,14 @@ class EventRecord:
         for field in array_fields:
             if field in data:
                 arr = np.array(data[field])
-                # Pad or truncate to 5 elements
-                if len(arr) < 5:
-                    padded = np.zeros(5, dtype=arr.dtype)
+                # Pad or truncate to match the dtype field size
+                field_size = record[field].shape[0]
+                if len(arr) < field_size:
+                    padded = np.zeros(field_size, dtype=arr.dtype)
                     padded[:len(arr)] = arr
                     record[field] = padded
                 else:
-                    record[field] = arr[:5]
+                    record[field] = arr[:field_size]
 
         return record
 

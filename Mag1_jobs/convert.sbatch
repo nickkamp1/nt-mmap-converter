@@ -4,7 +4,7 @@
 #SBATCH --error=slurm_logs/mmap_mag1_%j.err
 #SBATCH -p arguelles_delgado,sapphire,shared
 #SBATCH -c 8
-#SBATCH --time=03:00:00
+#SBATCH --time=05:00:00
 #SBATCH --mem=30000
 
 # Environment setup

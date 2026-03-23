@@ -108,7 +108,7 @@ def find_parquet_files(input_path: str) -> list:
     return files
 
 
-def parse_mc_truth(mc_truth_df, filetype=None) -> Dict[str, Any]:
+def parse_mc_truth(mc_truth_df, filetype=None, dummy_val=-9999.) -> Dict[str, Any]:
     """
     Parse MC truth information from magnemite format.
 
@@ -141,38 +141,36 @@ def parse_mc_truth(mc_truth_df, filetype=None) -> Dict[str, Any]:
             # hadrons
             'final_energy': [float(row['hnl_energy']),
                              float(row['hadrons_energy']),
-                             float(row['gamma_energy']),
-                             0.0, 0.0
+                             float(row['decay_product_0_energy']), # up to 3 visible decay products
+                             float(row['decay_product_1_energy']),
+                             float(row['decay_product_2_energy'])
                              ],
-            'final_azimuth': [0.0,
+            'final_azimuth': [dummy_val, # no HNL dir info for some reason
                               float(row['hadrons_azimuth']),
-                              float(row['gamma_azimuth']),
-                              0.0, 0.0
+                              float(row['decay_product_0_azimuth']), # up to 3 visible decay products
+                              float(row['decay_product_1_azimuth']),
+                              float(row['decay_product_2_azimuth'])
                               ],
-            'final_zenith': [0.0,
+            'final_zenith': [dummy_val,
                              float(row['hadrons_zenith']),
-                             float(row['gamma_zenith']),
-                             0.0, 0.0
+                             float(row['decay_product_0_zenith']), # up to 3 visible decay products
+                             float(row['decay_product_1_zenith']),
+                             float(row['decay_product_2_zenith'])
                              ],
-            'final_x': [float(row['nu_pos_x']),  # Use nu_pos for HNL position
-                        float(row['hadrons_pos_x']),
-                        float(row['gamma_pos_x']),
-                        0.0, 0.0
+            'final_x': [float(row['hadrons_pos_x']),  # first cascade: hadrons pos
+                        float(row['decay_pos_x']) # second cascade: decay pos
                         ],
-            'final_y': [float(row['nu_pos_y']),  # Use nu_pos for HNL position
-                        float(row['hadrons_pos_y']),
-                        float(row['gamma_pos_y']),
-                        0.0, 0.0
+            'final_y': [float(row['hadrons_pos_y']),  # first cascade: hadrons pos
+                        float(row['decay_pos_y']) # second cascade: decay pos
                         ],
-            'final_z': [float(row['nu_pos_z']),  # Use nu_pos for HNL position
-                        float(row['hadrons_pos_z']),
-                        float(row['gamma_pos_z']),
-                        0.0, 0.0
+            'final_z': [float(row['hadrons_pos_z']),  # first cascade: hadrons pos
+                        float(row['decay_pos_z']) # second cascade: decay pos
                         ],
-            'final_type': [5910,
+            'final_type': [int(row['hnl_pdg']),
                            2212, # hadrons as proton (2212)
-                           22,   # gamma (22)
-                           0, 0
+                           int(row['decay_product_0_pdg']),
+                           int(row['decay_product_1_pdg']),
+                           int(row['decay_product_2_pdg'])
                            ],
             # HNL
             'hnl_length': float(row['hnl_length']),
@@ -193,34 +191,31 @@ def parse_mc_truth(mc_truth_df, filetype=None) -> Dict[str, Any]:
             # hadrons
             'final_energy': [float(row['lepton_energy']),
                              float(row['hadrons_energy']),
-                             0.0, 0.0, 0.0
+                             dummy_val, dummy_val, dummy_val
                              ],
             'final_azimuth': [float(row['lepton_azimuth']),
                               float(row['hadrons_azimuth']),
-                              0.0, 0.0, 0.0
+                              dummy_val, dummy_val, dummy_val
                              ],
             'final_zenith': [float(row['lepton_zenith']),
                              float(row['hadrons_zenith']),
-                             0.0, 0.0, 0.0
+                             dummy_val, dummy_val, dummy_val
                             ],
             'final_x': [float(row['lepton_pos_x']),
-                        float(row['hadrons_pos_x']),
-                        0.0, 0.0, 0.0
+                        float(row['hadrons_pos_x'])
                         ],
             'final_y': [float(row['lepton_pos_y']),
-                        float(row['hadrons_pos_y']),
-                        0.0, 0.0, 0.0
+                        float(row['hadrons_pos_y'])
                         ],
             'final_z': [float(row['lepton_pos_z']),
-                        float(row['hadrons_pos_z']),
-                        0.0, 0.0, 0.0
+                        float(row['hadrons_pos_z'])
                         ],
             'final_type': [int(row['lepton_pdg']),
                            int(row['hadrons_pdg']),
-                           0, 0, 0
+                           int(dummy_val), int(dummy_val), int(dummy_val)
                            ],
             # HNL
-            'hnl_length': -1.0,
+            'hnl_length': dummy_val,
             'event_weight': float(row['nugen_weight']),
         }
     elif filetype=="CORSIKA":
@@ -235,16 +230,16 @@ def parse_mc_truth(mc_truth_df, filetype=None) -> Dict[str, Any]:
             'initial_z': float(row['primary_pos_z']),
             'initial_type': int(row['primary_pdg']),
             'interaction': 3, # background events: cosmics
-            # hadrons
-            'final_energy': [0.0,0.0,0.0, 0.0, 0.0],
-            'final_azimuth': [0.0, 0.0, 0.0, 0.0, 0.0],
-            'final_zenith': [0.0, 0.0, 0.0, 0.0, 0.0],
-            'final_x': [0.0, 0.0, 0.0, 0.0, 0.0],
-            'final_y': [0.0, 0.0, 0.0, 0.0, 0.0],
-            'final_z': [0.0, 0.0, 0.0, 0.0, 0.0],
-            'final_type': [0,0,0,0,0],
+            # no final state
+            'final_energy': [dummy_val, dummy_val, dummy_val, dummy_val, dummy_val],
+            'final_azimuth': [dummy_val, dummy_val, dummy_val, dummy_val, dummy_val],
+            'final_zenith': [dummy_val, dummy_val, dummy_val, dummy_val, dummy_val],
+            'final_x': [dummy_val, dummy_val],
+            'final_y': [dummy_val, dummy_val],
+            'final_z': [dummy_val, dummy_val],
+            'final_type': [int(dummy_val), int(dummy_val), int(dummy_val), int(dummy_val), int(dummy_val)],
             # HNL
-            'hnl_length': -1.0,
+            'hnl_length': dummy_val,
             'event_weight': float(row['corsika_weight']),
         }
     else:
